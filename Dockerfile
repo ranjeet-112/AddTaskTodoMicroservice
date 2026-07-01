@@ -1,20 +1,31 @@
-FROM python:3.9-bullseye
+FROM python:3.11-bookworm
 
 WORKDIR /app
 
 COPY . .
 
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    unixodbc \
+    unixodbc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Import Microsoft GPG key
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | \
+    gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+
+# Add Microsoft repository
+RUN echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
+    > /etc/apt/sources.list.d/microsoft-prod.list
+
+# Install Microsoft ODBC Driver 18
 RUN apt-get update && \
-    apt-get install -y curl gnupg2 apt-transport-https unixodbc unixodbc-dev
+    ACCEPT_EULA=Y apt-get install -y msodbcsql18
 
-RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-
-RUN curl https://packages.microsoft.com/config/debian/11/prod.list \
-    > /etc/apt/sources.list.d/mssql-release.list
-
-RUN apt-get update && \
-    ACCEPT_EULA=Y apt-get install -y msodbcsql17
-
+# Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
